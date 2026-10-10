@@ -1,14 +1,17 @@
+# Agent transcripts must never be committed or pushed (fork is public)
+transcripts/
+
+# Maven / Java build output
 target/
 *.class
 
-# Lab forks are public; transcripts stay local (the TA checks them at recitation).
-# Assignment repos are private and DO commit transcripts/.
-transcripts/
-
-# IDEs
+# IDE
 .idea/
-*.iml
 .vscode/
-.settings/
-.classpath
-.project
+*.iml
+*.ipr
+*.iws
+
+# OS
+.DS_Store
+Thumbs.db

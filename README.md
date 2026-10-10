@@ -28,4 +28,6 @@ See the Lab 1 handout on the course page for the three milestones you show a TA.
 
 ## 工具与模型声明
 - 工具：Claude Code（命令行）；IDE：IntelliJ IDEA
-- 模型：deepseek-v4 pro
+- 模型：Kimi K3
+
+Session transcripts are exported locally to `transcripts/` and are intentionally excluded from the repository (see `.gitignore`).
