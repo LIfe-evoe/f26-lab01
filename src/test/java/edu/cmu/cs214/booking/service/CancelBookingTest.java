@@ -2,6 +2,7 @@ package edu.cmu.cs214.booking.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import edu.cmu.cs214.booking.domain.Booking;
 import edu.cmu.cs214.booking.domain.Room;
@@ -39,5 +40,21 @@ class CancelBookingTest {
         svc.cancelBooking("no-such-id");
         assertEquals(1, svc.listBookings(roomA).size());
         assertEquals(1, store.waitlistForRoom(roomA).size());
+    }
+
+    @Test
+    void cancellingPromotesTheWaitlistedUser() { // S3
+        InMemoryBookingStore store = new InMemoryBookingStore();
+        BookingService svc = new BookingService(store);
+        BookingResult r = svc.book(roomA, alice, new TimeInterval(600, 660));
+        Booking a = assertInstanceOf(BookingResult.Confirmed.class, r).booking();
+        assertInstanceOf(BookingResult.Waitlisted.class,
+                svc.book(roomA, bob, new TimeInterval(630, 700)));
+        svc.cancelBooking(a.id());
+        assertEquals(1, svc.listBookings(roomA).size());
+        Booking promoted = svc.listBookings(roomA).get(0);
+        assertEquals(bob, promoted.user());
+        assertEquals(new TimeInterval(630, 700), promoted.interval());
+        assertTrue(store.waitlistForRoom(roomA).isEmpty());
     }
 }

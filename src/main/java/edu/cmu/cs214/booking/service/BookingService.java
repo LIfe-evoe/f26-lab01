@@ -50,13 +50,29 @@ public class BookingService {
 
     /**
      * Cancels the confirmed booking with the given id, freeing its slot.
-     * Unknown ids are ignored (no exception, no promotion).
+     * Unknown ids are ignored. The earliest fitting waitlisted user (by
+     * {@code seq}) for the same room is promoted; at most one is promoted.
      */
     public void cancelBooking(String bookingId) {
         Optional<Booking> maybeBooking = store.findBooking(bookingId);
         if (maybeBooking.isEmpty()) {
             return; // R3: unknown id, do nothing
         }
+        Booking cancelled = maybeBooking.get();
         store.removeBooking(bookingId);
+
+        List<WaitlistEntry> waiters = store.waitlistForRoom(cancelled.room()).stream()
+                .sorted(java.util.Comparator.comparingInt(WaitlistEntry::seq))
+                .toList();
+        for (WaitlistEntry waiter : waiters) {
+            boolean conflict = store.bookingsForRoom(cancelled.room()).stream()
+                    .anyMatch(existing -> existing.interval().overlaps(waiter.interval()));
+            if (!conflict) {
+                store.addBooking(new Booking("b" + nextBookingSeq++, waiter.room(), waiter.user(), waiter.interval()));
+                store.removeWaitlistEntry(waiter.id());
+                return; // R5: promote at most one
+            }
+            // R6: skip conflicting waiters, consider next
+        }
     }
 }
