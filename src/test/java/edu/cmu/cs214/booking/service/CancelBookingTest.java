@@ -57,4 +57,61 @@ class CancelBookingTest {
         assertEquals(new TimeInterval(630, 700), promoted.interval());
         assertTrue(store.waitlistForRoom(roomA).isEmpty());
     }
+
+    @Test
+    void cancellingPromotesAtMostOneWaiter() { // S4
+        InMemoryBookingStore store = new InMemoryBookingStore();
+        BookingService svc = new BookingService(store);
+        BookingResult r = svc.book(roomA, alice, new TimeInterval(600, 660));
+        Booking a = assertInstanceOf(BookingResult.Confirmed.class, r).booking();
+        assertInstanceOf(BookingResult.Waitlisted.class,
+                svc.book(roomA, bob, new TimeInterval(630, 700)));
+        assertInstanceOf(BookingResult.Waitlisted.class,
+                svc.book(roomA, charlie, new TimeInterval(640, 700)));
+        svc.cancelBooking(a.id());
+        // 只晋升最早排队的 bob；charlie 仍在候补
+        assertEquals(1, svc.listBookings(roomA).size());
+        assertEquals(bob, svc.listBookings(roomA).get(0).user());
+        assertEquals(1, store.waitlistForRoom(roomA).size());
+        assertEquals(charlie, store.waitlistForRoom(roomA).get(0).user());
+    }
+
+    @Test
+    void cancellingSkipsStillConflictingWaiters() { // S5
+        InMemoryBookingStore store = new InMemoryBookingStore();
+        BookingService svc = new BookingService(store);
+        BookingResult r = svc.book(roomA, alice, new TimeInterval(600, 660));
+        Booking a = assertInstanceOf(BookingResult.Confirmed.class, r).booking();
+        assertInstanceOf(BookingResult.Confirmed.class,
+                svc.book(roomA, dave, new TimeInterval(700, 760)));
+        // bob [630,730) 与 dave [700,760) 冲突，应被跳过；eve [610,650) 不冲突，应晋升
+        assertInstanceOf(BookingResult.Waitlisted.class,
+                svc.book(roomA, bob, new TimeInterval(630, 730)));
+        assertInstanceOf(BookingResult.Waitlisted.class,
+                svc.book(roomA, eve, new TimeInterval(610, 650)));
+        svc.cancelBooking(a.id());
+        assertEquals(2, svc.listBookings(roomA).size()); // dave + eve
+        assertTrue(svc.listBookings(roomA).stream()
+                .anyMatch(b -> b.user().equals(eve)));
+        assertEquals(1, store.waitlistForRoom(roomA).size()); // bob 仍被跳过留在候补
+        assertEquals(bob, store.waitlistForRoom(roomA).get(0).user());
+    }
+
+    @Test
+    void cancellingDoesNotPromoteAcrossRooms() { // S6
+        InMemoryBookingStore store = new InMemoryBookingStore();
+        BookingService svc = new BookingService(store);
+        BookingResult r = svc.book(roomA, alice, new TimeInterval(600, 660));
+        Booking a = assertInstanceOf(BookingResult.Confirmed.class, r).booking();
+        assertInstanceOf(BookingResult.Confirmed.class,
+                svc.book(roomB, dave, new TimeInterval(600, 660)));
+        assertInstanceOf(BookingResult.Waitlisted.class,
+                svc.book(roomB, bob, new TimeInterval(630, 700)));
+        svc.cancelBooking(a.id()); // 取消 roomA 的 alice
+        // roomB 的候补与确认预订均不受影响
+        assertEquals(1, store.waitlistForRoom(roomB).size());
+        assertEquals(bob, store.waitlistForRoom(roomB).get(0).user());
+        assertEquals(1, svc.listBookings(roomB).size());
+        assertEquals(dave, svc.listBookings(roomB).get(0).user());
+    }
 }
