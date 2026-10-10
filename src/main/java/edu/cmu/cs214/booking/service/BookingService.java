@@ -7,6 +7,7 @@ import edu.cmu.cs214.booking.domain.User;
 import edu.cmu.cs214.booking.domain.WaitlistEntry;
 import edu.cmu.cs214.booking.repo.BookingStore;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Coordinates bookings and the waitlist. Enforces the core invariant: a room
@@ -45,5 +46,17 @@ public class BookingService {
     /** Returns the confirmed bookings for {@code room}. */
     public List<Booking> listBookings(Room room) {
         return store.bookingsForRoom(room);
+    }
+
+    /**
+     * Cancels the confirmed booking with the given id, freeing its slot.
+     * Unknown ids are ignored (no exception, no promotion).
+     */
+    public void cancelBooking(String bookingId) {
+        Optional<Booking> maybeBooking = store.findBooking(bookingId);
+        if (maybeBooking.isEmpty()) {
+            return; // R3: unknown id, do nothing
+        }
+        store.removeBooking(bookingId);
     }
 }
